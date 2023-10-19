@@ -152,8 +152,15 @@ pub struct SignatureInfo {
 }
 impl SignatureInfo {
     pub fn extract_addr(&self) -> Result<String, ContractError> {
-        let claim_msg = from_slice::<ClaimMsg>(&self.claim_msg)?;
-        Ok(claim_msg.address)
+        let claim_msg = from_slice::<ClaimMsg>(&self.claim_msg);
+        // if err, try by sign direct
+        if claim_msg.is_err() {
+            let claim_msg_sign_direct = from_slice::<SignDirectClaimMsg>(&self.claim_msg)?;
+
+            Ok(claim_msg_sign_direct.tx_body.address)
+        } else {
+            Ok(claim_msg.unwrap().address)
+        }
     }
 }
 
@@ -162,4 +169,16 @@ pub struct ClaimMsg {
     // To provide claiming via ledger, the address is passed in the memo field of a cosmos msg.
     #[serde(rename = "memo")]
     address: String,
+}
+
+#[cw_serde]
+pub struct TxBody {
+    // To provide claiming via ledger, the address is passed in the memo field of a cosmos msg.
+    #[serde(rename = "memo")]
+    address: String,
+}
+
+#[cw_serde]
+pub struct SignDirectClaimMsg {
+    pub tx_body: TxBody,
 }
