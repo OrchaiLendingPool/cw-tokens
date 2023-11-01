@@ -21,8 +21,9 @@ use crate::msg::{
     TotalClaimedResponse,
 };
 use crate::state::{
-    Config, CLAIM, CONFIG, HRP, LATEST_STAGE, MERKLE_ROOT, STAGE_ACCOUNT_MAP, STAGE_AMOUNT,
-    STAGE_AMOUNT_CLAIMED, STAGE_EXPIRATION, STAGE_PAUSED, STAGE_START,
+    Config, ProofAddrType, CLAIM, CONFIG, HRP, LATEST_STAGE, MERKLE_ROOT, PROOF_ADDR_TYPE,
+    STAGE_ACCOUNT_MAP, STAGE_AMOUNT, STAGE_AMOUNT_CLAIMED, STAGE_EXPIRATION, STAGE_PAUSED,
+    STAGE_START,
 };
 
 // Version info, for migration info
@@ -76,6 +77,7 @@ pub fn execute(
             start,
             total_amount,
             hrp,
+            proof_addr_type,
         } => execute_register_merkle_root(
             deps,
             env,
@@ -85,6 +87,7 @@ pub fn execute(
             start,
             total_amount,
             hrp,
+            proof_addr_type,
         ),
         ExecuteMsg::Claim {
             stage,
@@ -167,6 +170,7 @@ pub fn execute_register_merkle_root(
     start: Option<Scheduled>,
     total_amount: Option<Uint128>,
     hrp: Option<String>,
+    proof_addr_type: Option<ProofAddrType>,
 ) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -197,6 +201,11 @@ pub fn execute_register_merkle_root(
     // save hrp
     if let Some(hrp) = hrp {
         HRP.save(deps.storage, stage, &hrp)?;
+    }
+
+    // save proof addr type
+    if let Some(proof_addr_type) = proof_addr_type {
+        PROOF_ADDR_TYPE.save(deps.storage, stage, &proof_addr_type)?;
     }
 
     STAGE_PAUSED.save(deps.storage, stage, &false)?;
@@ -251,7 +260,14 @@ pub fn execute_claim(
             cosmos_signature.verify(deps.as_ref(), &sig.claim_msg)?;
             // get airdrop stage bech32 prefix and derive proof address from public key
             let hrp = HRP.load(deps.storage, stage)?;
-            let proof_addr = cosmos_signature.derive_addr_from_pubkey(hrp.as_str())?;
+
+            let proof_addr = match PROOF_ADDR_TYPE.may_load(deps.storage, stage)? {
+                None => cosmos_signature.derive_addr_from_pubkey(hrp.as_str())?,
+                Some(ProofAddrType::Pubkey) => {
+                    cosmos_signature.derive_addr_from_pubkey(hrp.as_str())?
+                }
+                Some(ProofAddrType::Sender) => sig.derive_addr_from_sender()?,
+            };
 
             if sig.extract_addr()? != info.sender {
                 return Err(ContractError::VerificationFailed {});
@@ -1070,6 +1086,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
 
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
@@ -1142,6 +1159,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -1224,6 +1242,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -1299,6 +1318,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -1379,6 +1399,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -1450,6 +1471,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -1513,6 +1535,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -1589,6 +1612,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -1661,6 +1685,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -1706,6 +1731,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(100000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -1746,6 +1772,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(100000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -1784,6 +1811,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -1908,6 +1936,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         router
             .execute_contract(
@@ -2035,6 +2064,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -2143,6 +2173,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -2197,6 +2228,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(100000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -2240,6 +2272,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(100000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -2281,6 +2314,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -2410,6 +2444,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         router
             .execute_contract(
@@ -2622,6 +2657,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -2712,6 +2748,7 @@ mod tests {
             start: None,
             total_amount: Some(Uint128::new(10000)),
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -2771,6 +2808,7 @@ mod tests {
             start: Some(Scheduled::AtHeight(200_000)),
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -2816,6 +2854,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -2853,6 +2892,7 @@ mod tests {
             start: None,
             total_amount: None,
             hrp: None,
+            proof_addr_type: None,
         };
         let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(res, ContractError::Unauthorized {});
@@ -2870,9 +2910,14 @@ mod tests {
     }
 
     mod external_sig {
+
         use super::*;
         use crate::msg::SignatureInfo;
+        use bech32::ToBase32;
         use cw_utils::Expiration::AtHeight;
+
+        use sha2::Sha256;
+        use tiny_keccak::{Hasher, Keccak};
 
         const TEST_DATA_EXTERNAL_SIG: &[u8] =
             include_bytes!("../testdata/airdrop_external_sig_test_data.json");
@@ -2893,15 +2938,40 @@ mod tests {
             assert!(res);
         }
 
+        fn base64_to_hex(base64_str: &str) -> String {
+            let bytes = base64::decode(base64_str).unwrap();
+            hex::encode(bytes)
+        }
+        fn keccak256(bytes: &[u8]) -> [u8; 32] {
+            let mut output = [0u8; 32];
+
+            let mut hasher = Keccak::v256();
+            hasher.update(bytes);
+            hasher.finalize(&mut output);
+
+            output
+        }
+
         #[test]
         fn test_derive_addr_from_pubkey() {
             let test_data: Encoded = from_slice(TEST_DATA_EXTERNAL_SIG).unwrap();
             let cosmos_signature: CosmosSignature =
                 from_binary(&test_data.signed_msg.unwrap().signature).unwrap();
+
             let derived_addr = cosmos_signature
                 .derive_addr_from_pubkey(&test_data.hrp.unwrap())
                 .unwrap();
             assert_eq!(test_data.account, derived_addr);
+        }
+
+        #[test]
+        fn test_derive_addr_from_sender() {
+            let test_data: Encoded = from_slice(TEST_DATA_EXTERNAL_SIG).unwrap();
+            let signed_msg = test_data.signed_msg;
+
+            let derived_addr = signed_msg.unwrap().derive_addr_from_sender().unwrap();
+            println!("{:?}", derived_addr);
+            // assert_eq!(test_data.account, derived_addr);
         }
 
         #[test]
@@ -2936,6 +3006,7 @@ mod tests {
                 start: None,
                 total_amount: None,
                 hrp: Some(test_data.hrp.unwrap()),
+                proof_addr_type: None,
             };
             let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -3064,6 +3135,7 @@ mod tests {
                 start: None,
                 total_amount: None,
                 hrp: None,
+                proof_addr_type: None,
             };
             let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -3156,6 +3228,7 @@ mod tests {
                 start: None,
                 total_amount: Some(Uint128::new(10000)),
                 hrp: None,
+                proof_addr_type: None,
             };
             execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 

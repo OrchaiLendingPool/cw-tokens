@@ -12,6 +12,12 @@ pub struct Config {
     pub native_token: Option<String>,
 }
 
+#[cw_serde]
+pub enum ProofAddrType {
+    Pubkey,
+    Sender,
+}
+
 pub const CONFIG_KEY: &str = "config";
 pub const CONFIG: Item<Config> = Item::new(CONFIG_KEY);
 
@@ -49,3 +55,7 @@ pub const HRP: Map<u8, String> = Map::new(HRP_PREFIX);
 
 pub const STAGE_PAUSED_KEY: &str = "stage_paused";
 pub const STAGE_PAUSED: Map<u8, bool> = Map::new(STAGE_PAUSED_KEY);
+
+pub const PROOF_ADDR_TYPE_KEY: &str = "proof_addr_type";
+
+pub const PROOF_ADDR_TYPE: Map<u8, ProofAddrType> = Map::new(PROOF_ADDR_TYPE_KEY);

@@ -1,4 +1,4 @@
-use crate::ContractError;
+use crate::{state::ProofAddrType, ContractError};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{from_slice, Binary, Uint128};
 use cw_utils::{Expiration, Scheduled};
@@ -30,6 +30,8 @@ pub enum ExecuteMsg {
         // hrp is the bech32 parameter required for building external network address
         // from signature message during claim action. example "cosmos", "terra", "juno"
         hrp: Option<String>,
+        /// proofAddrType determine how to extract proof address from msg
+        proof_addr_type: Option<ProofAddrType>,
     },
     /// Claim does not check if contract has enough funds, owner must ensure it.
     Claim {
@@ -163,6 +165,12 @@ impl SignatureInfo {
             Ok(claim_msg.unwrap().address)
         }
     }
+
+    pub fn derive_addr_from_sender(&self) -> Result<String, ContractError> {
+        let msg_claim = from_slice::<SignDirectClaimMsg>(&self.claim_msg)?;
+
+        Ok(msg_claim.txBody.messages[0].value.sender.clone())
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -173,10 +181,23 @@ pub struct ClaimMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct TransferMsg {
+    #[serde(rename = "fromAddress")]
+    sender: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct CosmosMessages {
+    value: TransferMsg,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TxBody {
     // To provide claiming via ledger, the address is passed in the memo field of a cosmos msg.
     #[serde(rename = "memo")]
     address: String,
+
+    messages: Vec<CosmosMessages>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
