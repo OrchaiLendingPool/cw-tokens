@@ -2978,7 +2978,7 @@ mod tests {
         fn claim_with_external_sigs() {
             let mut deps = mock_dependencies_with_balance(&[Coin {
                 denom: "ujunox".to_string(),
-                amount: Uint128::new(1234567),
+                amount: Uint128::new(123456789),
             }]);
             let test_data: Encoded = from_slice(TEST_DATA_EXTERNAL_SIG).unwrap();
             let claim_addr = test_data
@@ -3006,7 +3006,7 @@ mod tests {
                 start: None,
                 total_amount: None,
                 hrp: Some(test_data.hrp.unwrap()),
-                proof_addr_type: None,
+                proof_addr_type: Some(ProofAddrType::Sender),
             };
             let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 

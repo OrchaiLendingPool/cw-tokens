@@ -167,9 +167,19 @@ impl SignatureInfo {
     }
 
     pub fn derive_addr_from_sender(&self) -> Result<String, ContractError> {
-        let msg_claim = from_slice::<SignDirectClaimMsg>(&self.claim_msg)?;
+        let claim_msg = from_slice::<ClaimMsg>(&self.claim_msg);
 
-        Ok(msg_claim.txBody.messages[0].value.sender.clone())
+        // if err, try by sign direct
+        if claim_msg.is_err() {
+            let claim_msg_sign_direct = from_slice::<SignDirectClaimMsg>(&self.claim_msg)?;
+
+            Ok(claim_msg_sign_direct.txBody.messages[0]
+                .value
+                .sender
+                .clone())
+        } else {
+            Ok(claim_msg.unwrap().msgs[0].value.sender.clone())
+        }
     }
 }
 
@@ -178,11 +188,13 @@ pub struct ClaimMsg {
     // To provide claiming via ledger, the address is passed in the memo field of a cosmos msg.
     #[serde(rename = "memo")]
     address: String,
+
+    msgs: Vec<CosmosMessages>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TransferMsg {
-    #[serde(rename = "fromAddress")]
+    #[serde(alias = "fromAddress", alias = "from_address")]
     sender: String,
 }
 
